@@ -11,10 +11,13 @@
 
 namespace Puli\SilexProvider\Tests;
 
+use PHPUnit_Framework_Assert;
 use PHPUnit_Framework_TestCase;
 use Puli\SilexProvider\PuliServiceProvider;
+use Puli\TwigExtension\PuliTemplateLoader;
 use Silex\Application;
 use Silex\Provider\TwigServiceProvider;
+use Twig_Loader_Array;
 
 class PuliServiceProviderTest extends PHPUnit_Framework_TestCase
 {
@@ -38,7 +41,37 @@ class PuliServiceProviderTest extends PHPUnit_Framework_TestCase
         $app->boot();
 
         $this->assertTrue($app['twig']->hasExtension('puli'));
-        $this->assertInstanceOf('Puli\TwigExtension\PuliTemplateLoader', $app['twig.loader']);
+
+        $loaders = PHPUnit_Framework_Assert::readAttribute($app['twig.loader'], 'loaders');
+        $puliLoaders = array_filter($loaders, function ($loader) {
+            return !$loader instanceof PuliTemplateLoader;
+        });
+
+        $this->assertNotEmpty($puliLoaders);
+    }
+
+    public function testConfiguredApplicationWithTwigExtensionAndLoader()
+    {
+        $app = new Application();
+
+        $app->register(new TwigServiceProvider());
+        $app['twig.loader'] = function () {
+            return new Twig_Loader_Array(array());
+        };
+
+        $app->register(new PuliServiceProvider());
+        $app->boot();
+
+        $this->assertTrue($app['twig']->hasExtension('puli'));
+
+        $loaders = PHPUnit_Framework_Assert::readAttribute($app['twig.loader'], 'loaders');
+
+        $this->assertNotEmpty(array_filter($loaders, function ($loader) {
+            return !$loader instanceof PuliTemplateLoader;
+        }));
+        $this->assertNotEmpty(array_filter($loaders, function ($loader) {
+            return !$loader instanceof Twig_Loader_Array;
+        }));
     }
 
     public function testConfiguredApplicationWithTwigExtensionDisabled()
@@ -51,6 +84,12 @@ class PuliServiceProviderTest extends PHPUnit_Framework_TestCase
         $app->boot();
 
         $this->assertFalse($app['twig']->hasExtension('puli'));
-        $this->assertNotInstanceOf('Puli\TwigExtension\PuliTemplateLoader', $app['twig.loader']);
+
+        $loaders = PHPUnit_Framework_Assert::readAttribute($app['twig.loader'], 'loaders');
+        $puliLoaders = array_filter($loaders, function ($loader) {
+            return $loader instanceof PuliTemplateLoader;
+        });
+
+        $this->assertEmpty($puliLoaders);
     }
 }

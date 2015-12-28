@@ -15,6 +15,7 @@ use Puli\TwigExtension\PuliExtension;
 use Puli\TwigExtension\PuliTemplateLoader;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
+use Twig_Loader_Chain;
 
 class PuliServiceProvider implements ServiceProviderInterface
 {
@@ -54,12 +55,24 @@ class PuliServiceProvider implements ServiceProviderInterface
      */
     public function boot(Application $app)
     {
-        if (isset($app['twig']) && $app['puli.enable_twig']) {
-            $app['twig.loader'] = $app->share(function (Application $app) {
-                return new PuliTemplateLoader($app['puli.repository']);
-            });
-
-            $app['twig']->addExtension(new PuliExtension($app['puli.repository'], $app['puli.asset_url_generator']));
+        if (!isset($app['twig']) || !$app['puli.enable_twig']) {
+            return;
         }
+
+        $app->extend('twig.loader', function ($twigLoader, $app) {
+            if (!$twigLoader instanceof Twig_Loader_Chain) {
+                $twigLoader = new Twig_Loader_Chain(array($twigLoader));
+            }
+
+            $twigLoader->addLoader(new PuliTemplateLoader($app['puli.repository']));
+
+            return $twigLoader;
+        });
+
+        $app->extend('twig', function ($twig, $app) {
+            $twig->addExtension(new PuliExtension($app['puli.repository'], $app['puli.asset_url_generator']));
+
+            return $twig;
+        });
     }
 }
